@@ -1,0 +1,49 @@
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(thread_sched_demo);
+
+#define STACK_SIZE 1024
+#define HIGH_PRIORITY 1
+#define LOW_PRIORITY 5
+
+K_THREAD_STACK_DEFINE(high_stack, STACK_SIZE);
+K_THREAD_STACK_DEFINE(low_stack, STACK_SIZE);
+
+struct k_thread high_thread_data;
+struct k_thread low_thread_data;
+
+void high_priority_thread(void *arg1, void *arg2, void *arg3)
+{
+	int count =3; 
+    while (count--) {
+        printk("High priority thread running\n");
+        k_sleep(K_MSEC(500));
+    }
+}
+
+void low_priority_thread(void *arg1, void *arg2, void *arg3)
+{
+	int count =3; 
+    while (count--) {
+        printk("Low priority thread running\n");
+        k_sleep(K_MSEC(500));
+    }
+}
+
+void main(void)
+{
+    printk("Starting scheduling demo...\n");
+
+    k_thread_create(&high_thread_data, high_stack, STACK_SIZE,
+                    high_priority_thread,
+                    NULL, NULL, NULL,
+                    HIGH_PRIORITY, 0, K_NO_WAIT);
+
+    k_thread_create(&low_thread_data, low_stack, STACK_SIZE,
+                    low_priority_thread,
+                    NULL, NULL, NULL,
+                    LOW_PRIORITY, 0, K_NO_WAIT);
+}
+
