@@ -1,0 +1,94 @@
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+
+/* Define thread stack size and priority */
+#define THREAD_STACK_SIZE 512
+#define THREAD_PRIORITY 5
+
+/* Thread A and Thread B entry points */
+void thread_a_entry(void *p1, void *p2, void *p3) {
+
+    static int count=10;
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    while (count--) {
+        printk("Hello from Thread A!\n");
+        k_msleep(1000); // Sleep for 1 second
+    }
+}
+
+void thread_b_entry(void *p1, void *p2, void *p3) {
+    static int count_b=3;
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    for(int i=0; i<10; i++) {
+        printk("Hello from Thread B!\n");
+        k_msleep(1500); // Sleep for 1.5 seconds
+    }
+}
+
+
+
+void thread_c_entry(void *p1, void *p2, void *p3) {
+    static int count_c=15;
+    ARG_UNUSED(p1);
+    ARG_UNUSED(p2);
+    ARG_UNUSED(p3);
+
+    while (count_c--) {
+        printk("Hello from Thread C!\n");
+        k_msleep(1500); // Sleep for 1.5 seconds
+    }
+}
+
+/* Thread IDs */
+K_THREAD_STACK_DEFINE(thread_a_stack, THREAD_STACK_SIZE);
+K_THREAD_STACK_DEFINE(thread_b_stack, THREAD_STACK_SIZE);
+K_THREAD_STACK_DEFINE(thread_c_stack, THREAD_STACK_SIZE);
+
+struct k_thread thread_a_data;
+struct k_thread thread_b_data;
+struct k_thread thread_c_data;
+
+void main(void) {
+    printk("Zephyr k_thread_create() Test\n");
+
+    /* Create Thread A */
+    k_tid_t tid_a = k_thread_create(&thread_a_data, thread_a_stack,
+                                   K_THREAD_STACK_SIZEOF(thread_a_stack),
+                                   thread_a_entry, NULL, NULL, NULL,
+                                   THREAD_PRIORITY, 0, K_NO_WAIT);
+    if (tid_a) {
+        printk("Thread A created successfully.\n");
+    } else {
+        printk("Error creating Thread A.\n");
+    }
+
+    /* Create Thread B */
+    k_tid_t tid_b = k_thread_create(&thread_b_data, thread_b_stack,
+                                   K_THREAD_STACK_SIZEOF(thread_b_stack),
+                                   thread_b_entry, NULL, NULL, NULL,
+                                   THREAD_PRIORITY, 0, K_NO_WAIT);
+    if (tid_b) {
+        printk("Thread B created successfully.\n");
+    } else {
+        printk("Error creating Thread B.\n");
+    }
+    
+#if 1 
+    /* Create Thread B */
+    k_tid_t tid_c = k_thread_create(&thread_c_data, thread_c_stack,
+                                   K_THREAD_STACK_SIZEOF(thread_b_stack),
+                                   thread_c_entry, NULL, NULL, NULL,
+                                   THREAD_PRIORITY, 0, K_NO_WAIT);
+    if (tid_c) {
+        printk("Thread C created successfully.\n");
+    } else {
+        printk("Error creating Thread B.\n");
+    }
+#endif 
+}
