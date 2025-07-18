@@ -2,6 +2,12 @@
 #include <zephyr/sys/printk.h>     // printk() for console output
 #include <zephyr/kernel/thread.h>  // Thread management APIs
 
+/*k_thread_name_set() ensures the thread names appear in the listing.
+k_thread_foreach() iterates over all active threads, including system ones like main and idle.
+You can adjust PRIORITY1 and PRIORITY2 to experiment with scheduling behavior.
+
+*/
+
 // Define stack size and priorities for the two threads
 #define STACK_SIZE 512
 #define PRIORITY1 1
