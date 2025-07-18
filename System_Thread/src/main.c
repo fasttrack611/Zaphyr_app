@@ -1,40 +1,65 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
+#include <zephyr/kernel/thread.h>
 
-K_SEM_DEFINE(my_sem, 0, 1);  // ISR-triggered semaphore
+#define STACK_SIZE 512
+#define PRIORITY1 1
+#define PRIORITY2 2
 
-// ISR-like timer handler
-void timer_expiry_handler(struct k_timer *timer_id) {
-    printk("ISR: Semaphore triggered\n");
-    k_sem_give(&my_sem);
-}
+K_THREAD_STACK_DEFINE(stack_area1, STACK_SIZE);
+K_THREAD_STACK_DEFINE(stack_area2, STACK_SIZE);
+struct k_thread thread_data1;
+struct k_thread thread_data2;
 
-// Timer that simulates interrupt
-K_TIMER_DEFINE(my_timer, timer_expiry_handler, NULL);
-
-// Additional system thread
-void logger_thread(void *a, void *b, void *c) {
-    while (1) {
-        printk("Logger thread: uptime = %lld ms\n", k_uptime_get());
-        k_sleep(K_SECONDS(2));
+void thread_func(void *p1, void *p2, void *p3) {
+int count=5; 
+	while (count--) {
+        printk("Thread %s running\n", (char *)p1);
+        k_sleep(K_MSEC(1000));
     }
 }
 
-//K_THREAD_DEFINE(logger_id, 1024, logger_thread, NULL, NULL, NULL, 4, 0, 0);
-K_THREAD_DEFINE(logger_id, 1024, logger_thread, NULL, NULL, NULL, -2, 0, 0);
+void print_thread_info(const struct k_thread *thread, void *user_data) {
+    const char *name = k_thread_name_get((k_tid_t)thread);
+    int prio = thread->base.prio;
+    size_t stack_size = thread->stack_info.size;
 
-int main(void) {
-    printk("System thread + CPU idle demo started\n");
-
-    k_timer_start(&my_timer, K_SECONDS(2), K_SECONDS(3));
-
-    while (1) {
-        if (k_sem_take(&my_sem, K_NO_WAIT) == 0) {
-            printk("Main thread: got semaphore, doing work\n");
-        } else {
-            printk("Main thread: no work, idling CPU\n");
-            k_cpu_idle();
-	    k_yield();  // Give other threads a chance to run
-        }
-    }
+    printk("Thread: %-12s | Priority: %2d | Stack size: %4zu bytes\n",
+           name ? name : "Unnamed",
+           prio,
+           stack_size);
 }
+
+
+
+void main(void) {
+    printk("\n Listing all threads (including system threads):\n\n");
+
+    k_thread_create(&thread_data1, stack_area1, STACK_SIZE,
+                    thread_func, "T1", NULL, NULL,
+                    PRIORITY1, 0, K_NO_WAIT);
+    k_thread_name_set(&thread_data1, "T1");
+
+    k_thread_create(&thread_data2, stack_area2, STACK_SIZE,
+                    thread_func, "T2", NULL, NULL,
+                    PRIORITY2, 0, K_NO_WAIT);
+    k_thread_name_set(&thread_data2, "T2");
+
+    k_thread_foreach(print_thread_info, NULL);
+}
+
+#if 0 
+void main(void) {
+    printk("\n Listing all threads (including system threads):\n\n");
+
+    k_thread_create(&thread_data1, stack_area1, STACK_SIZE,
+                    thread_func, "T1", NULL, NULL,
+                    PRIORITY1, 0, K_NO_WAIT);
+
+    k_thread_create(&thread_data2, stack_area2, STACK_SIZE,
+                    thread_func, "T2", NULL, NULL,
+                    PRIORITY2, 0, K_NO_WAIT);
+
+    k_thread_foreach(print_thread_info, NULL);
+}
+#endif 
