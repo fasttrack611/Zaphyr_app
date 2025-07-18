@@ -1,5 +1,14 @@
 #include <zephyr/kernel.h>       // Core kernel APIs: threads, sleep, etc.
 #include <zephyr/sys/printk.h>   // For printing messages to the console
+#include <zephyr/sys/util.h>
+
+/* Define a struct for messages */
+struct message {
+    uint32_t counter;
+};
+
+/* Create a message queue */
+K_MSGQ_DEFINE(my_msgq, sizeof(struct message), 10, 4);
 
 // Define the stack size for each thread
 #define STACK_SIZE 1024
@@ -28,14 +37,26 @@ struct k_thread thread4_data;
 // arg2: delay in milliseconds (casted to void*)
 // arg3: unused (can be NULL)
 // ---------------------------------------------
-void thread_fn(void *arg1, void *arg2, void *arg3)
+void producer_thread(void *arg1, void *arg2, void *arg3)
 {
-    const char *name = (const char *)arg1;               // Convert arg1 to string
-    int delay = (int)(uintptr_t)arg2;                    // Convert arg2 to int
-
+    struct message msg = {0};
     while (1) {
-        printk("%s: Running with delay %d ms\n", name, delay);
-        k_sleep(K_MSEC(delay));                          // Sleep for specified delay
+        msg.counter++;
+        if (k_msgq_put(&my_msgq, &msg, K_NO_WAIT) != 0) {
+            k_msgq_purge(&my_msgq);
+        }
+        printk("Producer sent: %d\n", msg.counter);
+        k_sleep(K_MSEC(500));
+    }
+}
+
+void consumer_thread(void *arg1, void *arg2, void *arg3)
+{
+    struct message msg;
+    while (1) {
+        if (k_msgq_get(&my_msgq, &msg, K_FOREVER) == 0) {
+            printk("Consumer received: %d\n", msg.counter);
+        }
     }
 }
 
@@ -45,25 +66,15 @@ void thread_fn(void *arg1, void *arg2, void *arg3)
 // ---------------------------------------------
 void main(void)
 {
-    printk("Starting 4-thread demo with different priorities and arguments\n");
+    printk("Starting producer-consumer demo\n");
 
-    // Create Thread A with highest priority and 500ms delay
+    // Create producer thread
     k_thread_create(&thread1_data, stack1, STACK_SIZE,
-                    thread_fn, "Thread A", (void *)500, NULL,
+                    producer_thread, NULL, NULL, NULL,
                     PRIORITY_1, 0, K_NO_WAIT);
 
-    // Create Thread B with priority 2 and 1000ms delay
+    // Create consumer thread
     k_thread_create(&thread2_data, stack2, STACK_SIZE,
-                    thread_fn, "Thread B", (void *)1000, NULL,
+                    consumer_thread, NULL, NULL, NULL,
                     PRIORITY_2, 0, K_NO_WAIT);
-
-    // Create Thread C with priority 3 and 1500ms delay
-    k_thread_create(&thread3_data, stack3, STACK_SIZE,
-                    thread_fn, "Thread C", (void *)1500, NULL,
-                    PRIORITY_3, 0, K_NO_WAIT);
-
-    // Create Thread D with lowest priority and 2000ms delay
-    k_thread_create(&thread4_data, stack4, STACK_SIZE,
-                    thread_fn, "Thread D", (void *)2000, NULL,
-                    PRIORITY_4, 0, K_NO_WAIT);
 }
