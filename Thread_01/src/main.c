@@ -25,26 +25,40 @@ K_THREAD_STACK_DEFINE(consumer_stack, STACK_SIZE);
 struct k_thread producer_data;
 struct k_thread consumer_data;
 
-//  Producer thread: sends messages to the queue
+// 🧵 Producer thread function
+// arg1: Thread name passed as a string (used in logs)
+// arg2 & arg3: Unused in this context
+
 void producer_thread(void *arg1, void *arg2, void *arg3)
 {
+    // 📛 Extract thread name from argument (used for log tracing)
     const char *name = (const char *)arg1;
+
+    // 📨 Create and initialize a message object
     struct message msg = {0};
 
     while (1) {
+        // 🔁 Increment the message counter for tracking sequence
         msg.counter++;
+
+        // 🏷️ Stamp the message with the producer's name
         strncpy(msg.origin, name, sizeof(msg.origin) - 1);
 
+        // 📨 Try to send the message to the queue without waiting
         if (k_msgq_put(&my_msgq, &msg, K_NO_WAIT) != 0) {
+            // ❌ If queue is full, log it and purge all messages (reset the queue)
             printk("%s: Queue full! Purging...\n", name);
             k_msgq_purge(&my_msgq);
         } else {
+            // ✅ Successful enqueue — log the message sent
             printk("%s: Sent counter value %d\n", name, msg.counter);
         }
 
+        // 💤 Delay before sending next message (controls producer rate)
         k_sleep(K_MSEC(500));
     }
 }
+
 
 //  Consumer thread: receives messages from the queue
 void consumer_thread(void *arg1, void *arg2, void *arg3)
