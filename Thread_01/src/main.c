@@ -1,80 +1,75 @@
-#include <zephyr/kernel.h>       // Core kernel APIs: threads, sleep, etc.
-#include <zephyr/sys/printk.h>   // For printing messages to the console
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
-/* Define a struct for messages */
+// 📨 Define the message structure sent via message queue
 struct message {
     uint32_t counter;
+    char origin[16];  // Optional: sender ID for debugging
 };
 
-/* Create a message queue */
+// 📬 Message queue declaration: up to 10 messages
 K_MSGQ_DEFINE(my_msgq, sizeof(struct message), 10, 4);
 
-// Define the stack size for each thread
+// 🧵 Stack size and thread priorities
 #define STACK_SIZE 1024
+#define PRIORITY_PRODUCER 1
+#define PRIORITY_CONSUMER 2
 
-// Define thread priorities (lower number = higher priority)
-#define PRIORITY_1 1  // Highest priority
-#define PRIORITY_2 2
-#define PRIORITY_3 3
-#define PRIORITY_4 4  // Lowest priority
+// 🧵 Thread stack and control blocks
+K_THREAD_STACK_DEFINE(producer_stack, STACK_SIZE);
+K_THREAD_STACK_DEFINE(consumer_stack, STACK_SIZE);
+struct k_thread producer_data;
+struct k_thread consumer_data;
 
-// Allocate memory for thread stacks
-K_THREAD_STACK_DEFINE(stack1, STACK_SIZE);
-K_THREAD_STACK_DEFINE(stack2, STACK_SIZE);
-K_THREAD_STACK_DEFINE(stack3, STACK_SIZE);
-K_THREAD_STACK_DEFINE(stack4, STACK_SIZE);
-
-// Declare thread control blocks
-struct k_thread thread1_data;
-struct k_thread thread2_data;
-struct k_thread thread3_data;
-struct k_thread thread4_data;
-
-// ---------------------------------------------
-// Thread function: accepts 3 arguments
-// arg1: thread name (string)
-// arg2: delay in milliseconds (casted to void*)
-// arg3: unused (can be NULL)
-// ---------------------------------------------
+//  Producer thread: sends messages to the queue
 void producer_thread(void *arg1, void *arg2, void *arg3)
 {
+    const char *name = (const char *)arg1;
     struct message msg = {0};
+
     while (1) {
         msg.counter++;
+        strncpy(msg.origin, name, sizeof(msg.origin) - 1);
+
         if (k_msgq_put(&my_msgq, &msg, K_NO_WAIT) != 0) {
+            printk("%s: Queue full! Purging...\n", name);
             k_msgq_purge(&my_msgq);
+        } else {
+            printk("%s: Sent counter value %d\n", name, msg.counter);
         }
-        printk("Producer sent: %d\n", msg.counter);
+
         k_sleep(K_MSEC(500));
     }
 }
 
+//  Consumer thread: receives messages from the queue
 void consumer_thread(void *arg1, void *arg2, void *arg3)
 {
+    const char *name = (const char *)arg1;
     struct message msg;
+
     while (1) {
         if (k_msgq_get(&my_msgq, &msg, K_FOREVER) == 0) {
-            printk("Consumer received: %d\n", msg.counter);
+            printk("%s: Received value %d from %s\n", name, msg.counter, msg.origin);
         }
     }
 }
 
-// ---------------------------------------------
-// Main function: entry point of the application
-// Creates and starts 4 threads with different priorities and arguments
-// ---------------------------------------------
+// 🧵 Main thread: creates and names the producer/consumer threads
 void main(void)
 {
-    printk("Starting producer-consumer demo\n");
+    printk("\n In Main() ::  Producer-Consumer demo App\n");
 
-    // Create producer thread
-    k_thread_create(&thread1_data, stack1, STACK_SIZE,
-                    producer_thread, NULL, NULL, NULL,
-                    PRIORITY_1, 0, K_NO_WAIT);
+    k_thread_create(&producer_data, producer_stack, STACK_SIZE,
+                    producer_thread, "Producer-Thread", NULL, NULL,
+                    PRIORITY_PRODUCER, 0, K_NO_WAIT);
 
-    // Create consumer thread
-    k_thread_create(&thread2_data, stack2, STACK_SIZE,
-                    consumer_thread, NULL, NULL, NULL,
-                    PRIORITY_2, 0, K_NO_WAIT);
+    k_thread_create(&consumer_data, consumer_stack, STACK_SIZE,
+                    consumer_thread, "Consumer-Thread", NULL, NULL,
+                    PRIORITY_CONSUMER, 0, K_NO_WAIT);
 }
+
