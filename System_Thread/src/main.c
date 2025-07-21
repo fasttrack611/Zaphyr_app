@@ -1,61 +1,108 @@
-#include <zephyr/kernel.h>         // Core kernel APIs
-#include <zephyr/sys/printk.h>     // printk() for console output
-#include <zephyr/kernel/thread.h>  // Thread management APIs
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/pm/pm.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/pm/pm.h>
 
-/*k_thread_name_set() ensures the thread names appear in the listing.
-k_thread_foreach() iterates over all active threads, including system ones like main and idle.
-You can adjust PRIORITY1 and PRIORITY2 to experiment with scheduling behavior.
+#include <zephyr/pm/pm.h>
+#include <zephyr/device.h>
+#include <zephyr/pm/device.h>
 
-*/
 
-// Define stack size and priorities for the two threads
-#define STACK_SIZE 512
-#define PRIORITY1 1
-#define PRIORITY2 2
+#define STACKSIZE 1024
+#define THREAD_PRIORITY 7
 
-// Allocate stack memory and thread control blocks
-K_THREAD_STACK_DEFINE(stack_area1, STACK_SIZE);
-K_THREAD_STACK_DEFINE(stack_area2, STACK_SIZE);
-struct k_thread thread_data1;
-struct k_thread thread_data2;
+LOG_MODULE_REGISTER(main);
 
-// Thread function that prints a message 5 times with 1-second delay
-void thread_func(void *p1, void *p2, void *p3) {
-    int count = 5;
-    while (count--) {
-        printk("Thread %s running\n", (char *)p1);
-        k_sleep(K_MSEC(1000));
+// Thread 1: Display system time
+void system_time_thread(void *thread_name, void *p2, void *p3)
+{
+    while (1) {
+        uint64_t uptime = k_uptime_get();
+        printk("Thread %s: System uptime: %llu ms\n", (char *)thread_name, uptime);
+        k_sleep(K_SECONDS(18));
     }
 }
 
-// Callback function to print information about each thread
-void print_thread_info(const struct k_thread *thread, void *user_data) {
-    const char *name = k_thread_name_get((k_tid_t)thread);  // Get thread name
-    int prio = thread->base.prio;                           // Get thread priority
-    size_t stack_size = thread->stack_info.size;            // Get stack size
-
-    printk("Thread: %-12s | Priority: %2d | Stack size: %4zu bytes\n",
-           name ? name : "Unnamed",
-           prio,
-           stack_size);
+// Thread 2: Collect system logs
+void system_log_thread(void *thread_name, void *p2, void *p3)
+{
+   int count=40; 
+    while (count--) {
+        printk("Thread %s: Collecting system logs...\n", (char *)thread_name);
+        log_process(); // Process and print pending log messages
+        k_sleep(K_SECONDS(2));
+    }
 }
 
-// Main function: creates threads and lists all threads
-void main(void) {
-    printk("\n Listing all threads (including system threads):\n\n");
+// Thread 3: Display system time
+void system_time_thread3(void *thread_name, void *p2, void *p3)
+{
+    while (1) {
+        uint64_t uptime = k_uptime_get();
+        printk("Thread %s: System uptime: %llu ms\n", (char *)thread_name, uptime);
+        k_sleep(K_SECONDS(1));
+    }
+}
 
-    // Create thread T1 with priority 1
-    k_thread_create(&thread_data1, stack_area1, STACK_SIZE,
-                    thread_func, "T1", NULL, NULL,
-                    PRIORITY1, 0, K_NO_WAIT);
-    k_thread_name_set(&thread_data1, "T1");  // Set thread name for visibility
+#if 0 
+// Power management thread (for demonstration)
+void power_management_thread(void *p1, void *p2, void *p3)
+{
+    while (1) {
+        printk("Power Management Thread: For demonstration...\n");
+        k_sleep(K_SECONDS(10));
+    }
+}
+#endif 
 
-    // Create thread T2 with priority 2
-    k_thread_create(&thread_data2, stack_area2, STACK_SIZE,
-                    thread_func, "T2", NULL, NULL,
-                    PRIORITY2, 0, K_NO_WAIT);
-    k_thread_name_set(&thread_data2, "T2");  // Set thread name for visibility
 
-    // List all threads using the callback
-    k_thread_foreach(print_thread_info, NULL);
+
+void power_management_thread(void *p1, void *p2, void *p3)
+{
+    const struct device *dev = DEVICE_DT_GET_ANY(zephyr_console);
+
+    while (1) {
+        uint64_t uptime = k_uptime_get();
+
+        printk("PM Thread: System uptime: %llu ms\n", uptime);
+
+        // Example: Suspend and resume a device
+        if (dev && device_is_ready(dev)) {
+            printk("PM Thread: Suspending console device...\n");
+            int ret = pm_device_action_run(dev, PM_DEVICE_ACTION_SUSPEND);
+            if (ret == 0) {
+                printk("PM Thread: Device suspended.\n");
+            } else {
+                printk("PM Thread: Device suspend failed: %d\n", ret);
+            }
+
+            k_sleep(K_SECONDS(2));
+
+            printk("PM Thread: Resuming console device...\n");
+            ret = pm_device_action_run(dev, PM_DEVICE_ACTION_RESUME);
+            if (ret == 0) {
+                printk("PM Thread: Device resumed.\n");
+            } else {
+                printk("PM Thread: Device resume failed: %d\n", ret);
+            }
+        }
+
+        // Optionally: Force system idle state for demonstration (not recommended for production)
+         printk("PM Thread: Forcing system idle...\n");
+
+        k_sleep(K_SECONDS(10));
+    }
+}
+
+K_THREAD_DEFINE(system_time_thread1_id, STACKSIZE, system_time_thread, "T1", NULL, NULL, THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(system_log_thread2_id, STACKSIZE, system_log_thread, "T2", NULL, NULL, THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(system_time_thread3_id, STACKSIZE, system_time_thread3, "T3", NULL, NULL, THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(power_management_thread_id, STACKSIZE, power_management_thread, NULL, NULL, NULL, THREAD_PRIORITY+1, 0, 0);
+
+void main(void)
+{
+    printk("Main thread is running\n");
+    LOG_INF("System started!");
 }
