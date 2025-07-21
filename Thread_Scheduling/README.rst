@@ -1,47 +1,66 @@
-.. zephyr:code-sample:: synchronization
-   :name: Basic Synchronization
-   :relevant-api: thread_apis semaphore_apis
+This demo showcases how threads transition through different states in Zephyr:
 
-   Manipulate basic kernel synchronization primitives.
+Sleeping → via k_sleep()
 
-Overview
-********
+Pending (Blocked) → via k_sem_take()
 
-A simple application that demonstrates basic sanity of the kernel.
-Two threads (A and B) take turns printing a greeting message to the console,
-and use sleep requests and semaphores to control the rate at which messages
-are generated. This demonstrates that kernel scheduling, communication,
-and timing are operating correctly.
+Suspended → via k_thread_suspend()
 
-Building and Running
-********************
+Ready/Running → upon resume or resource availability
 
-This project outputs to the console.  It can be built and executed
-on QEMU as follows:
+These transitions are orchestrated by a dedicated controller thread to visualize how the RTOS scheduler responds.
 
-.. zephyr-app-commands::
-   :zephyr-app: samples/synchronization
-   :host-os: unix
-   :board: qemu_x86
-   :goals: run
-   :compact:
+🧵 Thread Roles
+✅ 1. Sleeper Thread (sleeper_thread)
+Simulates a task that performs periodic work and sleeps in between.
 
-Sample Output
-=============
+Uses k_sleep(K_SECONDS(2)) to enter the sleeping state.
 
-.. code-block:: console
+Can be externally suspended and resumed by another thread (k_thread_suspend, k_thread_resume).
 
-   threadA: Hello World!
-   threadB: Hello World!
-   threadA: Hello World!
-   threadB: Hello World!
-   threadA: Hello World!
-   threadB: Hello World!
-   threadA: Hello World!
-   threadB: Hello World!
-   threadA: Hello World!
-   threadB: Hello World!
+✅ 2. Pending Thread (pending_thread)
+Waits on a semaphore using k_sem_take() with K_FOREVER.
 
-   <repeats endlessly>
+This places the thread in the pending state until the semaphore is given by the controller.
 
-Exit QEMU by pressing :kbd:`CTRL+A` :kbd:`x`.
+Simulates a task waiting for hardware or resource availability.
+
+✅ 3. Controller Thread (controller_thread)
+Manages the state of sleeper and pending threads.
+
+Suspends/resumes the sleeper thread explicitly.
+
+Gives the semaphore to unblock the pending thread.
+
+Runs periodically to cycle through control logic.
+
+📦 Key Kernel Concepts Used
+Concept	Usage Purpose
+k_sleep()	Moves thread to sleeping state for a duration
+k_thread_suspend()	Moves thread to suspended state (manual halt)
+k_thread_resume()	Moves suspended thread back to ready state
+k_sem_take()	Blocks thread until a semaphore is given (pending)
+k_sem_give()	Unblocks a thread waiting on semaphore
+k_thread_create()	Creates threads dynamically
+k_tid_t	Thread ID handle, used for controlling other threads
+🔄 Thread State Transition Flow
+plaintext
+[Sleeper] --> sleeping via k_sleep()
+            ↕ (Controller can suspend/resume)
+
+[Pending] --> pending via k_sem_take()
+            ↕ (Controller gives semaphore)
+
+[Controller] --> runs all the time to control others
+This design visually reveals the nature of how real-time operating systems handle thread scheduling and resource synchronization.
+
+💡 Use Case Simulation
+You could repurpose this model to simulate:
+
+ISR-triggered wake-ups
+
+Low-power suspended peripherals
+
+Task-to-task dependency chains
+
+Debugging RTOS scheduling behavior
