@@ -1,0 +1,29 @@
+#include <zephyr/kernel.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/drivers/timer/system_timer.h>
+
+#define STACK_SIZE 512
+#define THREAD_PRIORITY 5
+
+K_SEM_DEFINE(my_sem, 0, 1);  // Initial count 0
+
+void timer_simulator(void *a, void *b, void *c) {
+    while (1) {
+        k_sleep(K_SECONDS(2));
+        printk("Timer thread: giving semaphore\n");
+        k_sem_give(&my_sem);
+    }
+}
+
+K_THREAD_DEFINE(timer_tid, STACK_SIZE, timer_simulator, NULL, NULL, NULL,
+                THREAD_PRIORITY, 0, 0);
+
+int main(void) {
+    printk("System thread demo started\n");
+
+    while (1) {
+        printk("Main thread: waiting for semaphore\n");
+        k_sem_take(&my_sem, K_FOREVER);
+        printk("Main thread: got semaphore\n");
+    }
+}
