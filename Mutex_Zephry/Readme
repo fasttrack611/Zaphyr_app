@@ -1,0 +1,16 @@
+
+What Happens
+- Thread 1 locks mutex_a, then tries to lock mutex_b.
+- Thread 2 locks mutex_b, then tries to lock mutex_a.
+- If both threads acquire their first mutex before the other releases the second, they’ll deadlock — each waiting forever for the other to release.
+
+
+How to Detect It
+- Console output will show both threads stuck after printing:
+🔒 Thread 1: locking mutex B
+🔒 Thread 2: locking mutex A
+
+- No further progress — classic deadlock.
+
+Want to extend this with timeout-based recovery (k_mutex_lock(..., K_MSEC(500))) or priority inheritance to mitigate deadlock risk? I can help you build a robust mutex strategy next. You're exploring concurrency like a true RTOS engineer
+
