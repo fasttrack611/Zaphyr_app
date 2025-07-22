@@ -1,0 +1,33 @@
+Key Implementation Notes:
+
+Idle Time Measurement:
+
+Uses execution cycles of idle threads
+
+Calculates utilization: 100% - (idle_time / total_time)
+
+Thread Migration:
+
+Changes CPU affinity masks
+
+Preserves original affinity constraints
+
+Uses kernel thread monitor API for iteration
+
+CPU-bound Task Detection:
+
+Prioritizes threads with highest runtime
+
+Skips threads with essential flag
+
+Ignores sleeping/waiting threads
+
+Scheduler Integration:
+
+Runs at lower priority than application threads
+
+Minimal overhead during normal operation
+
+Safe interaction with scheduler APIs
+
+This implementation provides dynamic load balancing while maintaining system stability. The balancer thread has minimal overhead and automatically adapts to changing workload conditions in SMP systems.
