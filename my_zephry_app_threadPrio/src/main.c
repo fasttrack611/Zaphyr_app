@@ -101,3 +101,51 @@ void main(void)
                     thread3_fn, NULL, NULL, NULL,
                     PRIORITY - 1, 0, K_NO_WAIT);
 }
+
+
+/*
+```c
+k_thread_create(&thread1_data, thread1_stack, STACK_SIZE,
+                thread1_fn, NULL, NULL, NULL,
+                HIGH_PRIORITY, 0, K_NO_WAIT);
+```
+
+### 🔍 What is `thread1_data`?
+
+`thread1_data` is a **thread control block** of type `struct k_thread`. It is used by the Zephyr kernel to **track and manage the state and metadata** of the thread being created.
+
+---
+
+### 🧵 Role of `struct k_thread`
+
+This structure holds internal information about the thread, such as:
+
+- **Thread state** (e.g., ready, running, sleeping, suspended)
+- **Priority**
+- **Stack pointer**
+- **Scheduling info**
+- **Thread entry function and arguments**
+- **Thread ID and name (if assigned)**
+
+You declared it earlier in your code:
+
+```c
+struct k_thread thread1_data;
+```
+
+This is a **statically allocated thread descriptor**, which is passed to `k_thread_create()` so the kernel can initialize and manage the thread.
+
+---
+
+### 🧠 Why is it needed?
+
+Unlike `K_THREAD_DEFINE()` which hides this detail, `k_thread_create()` requires you to explicitly provide:
+
+- A **stack** (`thread1_stack`)
+- A **control block** (`thread1_data`)
+- A **function** to run (`thread1_fn`)
+- **Priority and options**
+
+This gives you **more control** over thread creation and lifecycle.
+
+*/
