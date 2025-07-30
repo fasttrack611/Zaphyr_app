@@ -79,3 +79,19 @@ int main(void)
 
     return 0;
 }
+
+
+/* 
+Concept Overview
+Mutex (k_mutex): Ensures exclusive access to shared data (flag_ready).
+Condition Variable (k_condvar): Allows one thread to wait for a condition to become true, and another thread to signal it.
+Thread A: Waits until flag_ready == true.
+Thread B: Sets flag_ready = true and signals Thread A to wake up.
+
+
+
+    How It Works
+Thread A starts and locks the mutex.
+It checks flag_ready. Since it's false, it waits on the condition variable.
+Thread B starts after a delay, locks the mutex, sets flag_ready = true, and signals the condition variable.
+Thread A wakes up, re-acquires the mutex, sees that flag_ready is now true, and continues execution. */ 
